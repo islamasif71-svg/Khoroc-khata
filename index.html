@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>হাজী মোদাচ্ছের ক্লথ স্টোর - খরচ ও হিসাব-নিকাশ</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        :root { --blue: #1e88e5; --dark: #263238; --gold: #ffd600; --green: #43a047; --red: #d32f2f; --orange: #fb8c00; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .header { background: var(--dark); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 25px; border-bottom: 4px solid var(--gold); }
+        
+        .grid-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .box { background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 20px; }
+        h3 { margin-top: 0; color: var(--blue); border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        
+        .form-group { margin-bottom: 12px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #444; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+        
+        .btn { padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-green { background: var(--green); color: white; width: 100%; margin-top: 10px; }
+        .btn-blue { background: var(--blue); color: white; }
+        .btn-red { background: var(--red); color: white; padding: 3px 8px; font-size: 12px; }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .stat-card { padding: 15px; border-radius: 10px; text-align: center; color: white; }
+        
+        .rank-box { background: #fff; padding: 0; border-radius: 10px; border: 1px solid #ddd; overflow: hidden; }
+        .rank-header { background: #eceff1; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; border-bottom: 1px solid #ddd; }
+        .rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
+        .rank-item:nth-child(even) { background: #fafafa; }
+        .rank-item b { color: var(--red); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f5f5f5; color: var(--dark); }
+
+        .date-filter { background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--blue); flex-wrap: wrap; }
+        
+        @media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } .summary-cards { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin:0;">হাজী মোদাচ্ছের ক্লথ স্টোর</h2>
+        <p style="margin:5px 0 0;">খরচ ও ক্যাটাগরি ম্যানেজমেন্ট</p>
+    </div>
+
+    <div class="grid-layout">
+        <div>
+            <div class="box">
+                <h3>⚙️ খরচের খাত সেটআপ</h3>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="newExpCatInput" placeholder="নতুন খাতের নাম">
+                    <button class="btn btn-blue" onclick="addExpenseCategory()">যোগ</button>
+                </div>
+                <div id="expCatList" style="margin-top:10px; max-height: 100px; overflow-y: auto; font-size: 13px;"></div>
+            </div>
+
+            <div class="box">
+                <h3>💸 খরচ এন্ট্রি</h3>
+                <div class="form-group">
+                    <label>খাত বেছে নিন</label>
+                    <select id="expenseDropdown"></select>
+                </div>
+                <div class="form-group">
+                    <label>টাকার পরিমাণ</label>
+                    <input type="number" id="expAmount" placeholder="০.০০">
+                </div>
+                <div class="form-group">
+                    <label>তারিখ</label>
+                    <input type="date" id="expDate">
+                </div>
+                <div class="form-group">
+                    <label>নোট</label>
+                    <input type="text" id="expNote" list="noteSuggestions" placeholder="সংক্ষিপ্ত বর্ণনা">
+                    <datalist id="noteSuggestions"></datalist>
+                </div>
+                <button class="btn btn-green" onclick="saveExpense()">সেভ করুন</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="date-filter">
+                <span>📅 ফিল্টার:</span>
+                <input type="date" id="filterDate" onchange="loadExpenseReport()" style="width: 150px;">
+                <input type="month" id="filterMonth" onchange="loadExpenseReport()" style="width: 150px;">
+                <button class="btn btn-blue" onclick="resetFilter()">আজ</button>
+            </div>
+
+            <div class="summary-cards">
+                <div class="stat-card" style="background: var(--blue);">
+                    <small>দিন ভিত্তিক খরচ</small><br>
+                    <b id="dateWiseTotal" style="font-size: 20px;">০/-</b>
+                </div>
+                <div class="stat-card" style="background: var(--orange);">
+                    <small>মাস ভিত্তিক খরচ</small><br>
+                    <b id="monthWiseTotal" style="font-size: 20px;">০/-</b>
+                </div>
+                <div class="stat-card" style="background: var(--dark);">
+                    <small>মোট খাতা</small><br>
+                    <b id="totalCats" style="font-size: 20px;">০ টি</b>
+                </div>
+            </div>
+
+            <div class="box">
+                <h3 id="rankTitle" style="color: var(--red);">🏆 র‍্যাঙ্কিং রিপোর্ট</h3>
+                <div class="rank-box">
+                    <div class="rank-header">
+                        <span>খাতের নাম</span>
+                        <span>মোট ব্যয়</span>
+                    </div>
+                    <div id="rankingListDisplay">
+                        <p style="padding:10px; text-align:center;">তথ্য লোড হচ্ছে...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box" style="max-height: 350px; overflow-y: auto;">
+                <h3>📜 খরচের তালিকা</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>তারিখ</th>
+                            <th>খাত</th>
+                            <th>পরিমাণ</th>
+                            <th>নোট</th>
+                            <th>অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyB-4NWcWQgw5vkAnq8r1gZKzM-nS53hIeQ",
+        authDomain: "haji-cloth-store.firebaseapp.com",
+        databaseURL: "https://haji-cloth-store-default-rtdb.firebaseio.com",
+        projectId: "haji-cloth-store",
+        storageBucket: "haji-cloth-store.firebasestorage.app",
+        messagingSenderId: "944010988937",
+        appId: "1:944010988937:web:3e5339759862691312a558"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const today = new Date().toISOString().split('T')[0];
+    const currentMonthStr = today.slice(0, 7);
+    
+    document.getElementById('expDate').value = today;
+    document.getElementById('filterDate').value = today;
+    document.getElementById('filterMonth').value = currentMonthStr;
+
+    function resetFilter() {
+        document.getElementById('filterDate').value = today;
+        document.getElementById('filterMonth').value = currentMonthStr;
+        loadExpenseReport();
+    }
+
+    function loadExpenseCategories() {
+        db.ref('settings/expense_categories').on('value', snap => {
+            const cats = snap.val() || ["চা-নাস্তা", "বিদ্যুৎ বিল"];
+            let dropHtml = "";
+            let listHtml = "";
+            cats.forEach((c, i) => {
+                dropHtml += `<option value="${c}">${c}</option>`;
+                listHtml += `<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #eee;">
+                                <span>${c}</span><button class="btn-red" onclick="deleteExpCategory(${i})">×</button></div>`;
+            });
+            document.getElementById('expenseDropdown').innerHTML = dropHtml;
+            document.getElementById('expCatList').innerHTML = listHtml;
+            document.getElementById('totalCats').innerText = cats.length + " টি";
+        });
+    }
+
+    function addExpenseCategory() {
+        const val = document.getElementById('newExpCatInput').value.trim();
+        if(!val) return;
+        db.ref('settings/expense_categories').once('value', snap => {
+            let cats = snap.val() || [];
+            cats.push(val);
+            db.ref('settings/expense_categories').set(cats);
+            document.getElementById('newExpCatInput').value = "";
+        });
+    }
+
+    function deleteExpCategory(i) {
+        if(!confirm("মুছে ফেলবেন?")) return;
+        db.ref('settings/expense_categories').once('value', snap => {
+            let cats = snap.val();
+            cats.splice(i, 1);
+            db.ref('settings/expense_categories').set(cats);
+        });
+    }
+
+    function saveExpense() {
+        const cat = document.getElementById('expenseDropdown').value;
+        const amt = Math.round(parseFloat(document.getElementById('expAmount').value)) || 0;
+        const date = document.getElementById('expDate').value;
+        const note = document.getElementById('expNote').value.trim();
+
+        if (amt <= 0 || !date) { alert("সঠিক তথ্য দিন!"); return; }
+
+        const expID = "EXP" + Date.now().toString().slice(-6);
+        db.ref('expenses/' + expID).set({
+            category: cat, amount: amt, date: date, note: note
+        }).then(() => {
+            alert("সেভ হয়েছে!");
+            document.getElementById('expAmount').value = "";
+            document.getElementById('expNote').value = "";
+        });
+    }
+
+    function deleteExpense(id) {
+        if(confirm("এই খরচের হিসাবটি মুছে ফেলবেন?")) {
+            db.ref('expenses/' + id).remove();
+        }
+    }
+
+    function loadExpenseReport() {
+        const fDate = document.getElementById('filterDate').value;
+        const fMonth = document.getElementById('filterMonth').value;
+        
+        document.getElementById('rankTitle').innerText = `🏆 র‍্যাঙ্কিং রিপোর্ট (${fMonth})`;
+
+        db.ref('expenses').on('value', snap => {
+            const data = snap.val();
+            let tableHtml = "";
+            let dateTotal = 0;
+            let monthTotal = 0;
+            let monthCatTotals = {};
+            let uniqueNotes = new Set();
+
+            if (data) {
+                for (let id in data) {
+                    const item = data[id];
+                    
+                    if (item.note) uniqueNotes.add(item.note);
+
+                    if (item.date.startsWith(fMonth)) {
+                        monthTotal += item.amount;
+                        monthCatTotals[item.category] = (monthCatTotals[item.category] || 0) + item.amount;
+                    }
+
+                    if (item.date === fDate) {
+                        dateTotal += item.amount;
+                        tableHtml += `<tr>
+                                        <td>${item.date}</td>
+                                        <td><b>${item.category}</b></td>
+                                        <td>${Math.round(item.amount)}/-</td>
+                                        <td>${item.note || '-'}</td>
+                                        <td><button class="btn-red" onclick="deleteExpense('${id}')">মুছুন</button></td>
+                                      </tr>`;
+                    }
+                }
+
+                document.getElementById('dateWiseTotal').innerText = Math.round(dateTotal) + "/-";
+                document.getElementById('monthWiseTotal').innerText = Math.round(monthTotal) + "/-";
+                
+                const sortedMonth = Object.entries(monthCatTotals).sort((a,b) => b[1]-a[1]);
+                let rankHtml = "";
+                sortedMonth.forEach(([name, total]) => {
+                    rankHtml += `<div class="rank-item"><span>${name}</span><b>${Math.round(total)}/-</b></div>`;
+                });
+                
+                let noteHtml = "";
+                uniqueNotes.forEach(note => { noteHtml += `<option value="${note}">`; });
+                document.getElementById('noteSuggestions').innerHTML = noteHtml;
+
+                document.getElementById('rankingListDisplay').innerHTML = rankHtml || "<p style='padding:10px; text-align:center; color:#999;'>এই মাসে কোনো রেকর্ড নেই।</p>";
+                document.getElementById('expenseTableBody').innerHTML = tableHtml || "<tr><td colspan='5' style='text-align:center; padding:20px;'>তথ্য নেই।</td></tr>";
+            } else {
+                document.getElementById('dateWiseTotal').innerText = "০/-";
+                document.getElementById('monthWiseTotal').innerText = "০/-";
+                document.getElementById('rankingListDisplay').innerHTML = "<p style='padding:10px; text-align:center;'>তথ্য নেই।</p>";
+            }
+        });
+    }
+
+    window.onload = () => { loadExpenseCategories(); loadExpenseReport(); };
+</script>
+
+</body>
+</html>
