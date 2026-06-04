@@ -7,6 +7,7 @@
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     
     <style>
         :root { --blue: #1e88e5; --dark: #263238; --gold: #ffd600; --green: #43a047; --red: #d32f2f; --orange: #fb8c00; }
@@ -156,6 +157,10 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Auth check — Main Code থেকে login না করলে ঢুকতে পারবে না
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user === null) { window.location.href = 'https://islamasif71-svg.github.io/MAIN-POS/'; }
+    });
     const today = new Date().toISOString().split('T')[0];
     const currentMonthStr = today.slice(0, 7);
     
